@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import wandb
 from rich import box
+from rich import print as printer
 from rich.live import Live
 from rich.table import Table
 from stable_baselines3 import PPO
@@ -47,7 +48,7 @@ def make_mdp_table(obs: ObsType, rewards: list[float]) -> Table:
     table.add_row('live', f'{rewards[0]:.3f}')
     table.add_row('x_ratio', f'{rewards[1]:.3f}')
     table.add_row('y_ratio', f'{rewards[2]:.3f}')
-    table.add_row('ang_vel', f'{rewards[3]:.3f}')
+    table.add_row('ang', f'{rewards[3]:.3f}')
  
     return table
 
@@ -55,9 +56,10 @@ def make_mdp_table(obs: ObsType, rewards: list[float]) -> Table:
 def simulation_test(
         action_provider: Callable[[ObsType], ActType],
         step_callback: Callable[[ObsType, ActType, list[float], bool, bool], None]|None = None,
-        initial_state_radomization: bool = True
+        initial_state_radomization: bool = True,
+        timeout: int = 120 * 100
     ):
-    sim = Sim(120 * 100, action_period=2, window_size=(1920, 1080))
+    sim = Sim(timeout, action_period=2, window_size=(1920, 1080))
     if initial_state_radomization:
         sim.reset(seed=int(np.random.default_rng().integers(0, 2**32)))
 
@@ -122,6 +124,7 @@ def model_test():
     parser.add_argument('run_id', type=str, help='run name of trained model')
     parser.add_argument('--type', type=str, choices=['end', 'best'], default='best', help='choice model to use')
     parser.add_argument('--device', type=str, choices=['cuda', 'cpu'], default='cuda')
+    parser.add_argument('--timeout', type=int)
     args = parser.parse_args()
     device = torch.device(args.device)
 
@@ -156,7 +159,15 @@ def model_test():
         return action.cpu().numpy().astype(np.int32)
 
     with Live(Table()) as live:
-        simulation_test(
-            action_provider=action_provider,
-            step_callback=lambda o, a, r, ter, tru : live.update(make_mdp_table(o, r))
-        )
+        if args.timeout:
+            printer(f'[bold]INFO[/bold]: timeout option set to {args.timeout}')
+            simulation_test(
+                action_provider=action_provider,
+                step_callback=lambda o, a, r, ter, tru : live.update(make_mdp_table(o, r)),
+                timeout=args.timeout
+            )
+        else:
+            simulation_test(
+                action_provider=action_provider,
+                step_callback=lambda o, a, r, ter, tru : live.update(make_mdp_table(o, r))
+            )

@@ -93,7 +93,7 @@ public:
             1.0f,
             0.5f - 2 * std::fabs(0.5f - xRatio),
             0.5f - 2 * std::fabs(0.5f - yRatio),
-            0.5f - std::tanh(std::fabs(sim_.rocket().rb().angularVel() / 5)),
+            0.5f * std::cos(sim_.rocket().transform().angle),
         };
         return reward;
     }
