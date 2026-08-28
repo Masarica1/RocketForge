@@ -1,0 +1,62 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.cache/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.pyright/
+
+# Python environments
+.venv/
+venv/
+env/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Compiled native extension copied into the Python package
+learning/simulation/*.pyd
+learning/simulation/*.so
+learning/simulation/*.dylib
+
+# CMake generated files (also covers accidental in-source builds)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# Training runs, checkpoints, and experiment logs
+logs/
+wandb/
+
+# Coverage and test output
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Editors and IDEs
+.vscode/
+.idea/
+.vs/
+*.user
+*.suo
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini

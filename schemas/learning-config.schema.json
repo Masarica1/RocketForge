@@ -1,0 +1,180 @@
+{
+  "$defs": {
+    "EnvConfig": {
+      "properties": {
+        "exp_name": {
+          "title": "Exp Name",
+          "type": "string"
+        },
+        "wandb_project_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wandb Project Name"
+        },
+        "progress_bar": {
+          "default": true,
+          "title": "Progress Bar",
+          "type": "boolean"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        },
+        "randomize_initial_state": {
+          "default": true,
+          "title": "Randomize Initial State",
+          "type": "boolean"
+        },
+        "torch_deterministic": {
+          "default": true,
+          "title": "Torch Deterministic",
+          "type": "boolean"
+        },
+        "device": {
+          "default": "cuda",
+          "title": "Device",
+          "type": "string"
+        },
+        "timeout": {
+          "default": 21600,
+          "title": "Timeout",
+          "type": "integer"
+        },
+        "action_period": {
+          "default": 2,
+          "title": "Action Period",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "exp_name"
+      ],
+      "title": "EnvConfig",
+      "type": "object"
+    },
+    "TrainingConfig": {
+      "properties": {
+        "total_timesteps": {
+          "title": "Total Timesteps",
+          "type": "integer"
+        },
+        "learning_rate": {
+          "default": 0.0002,
+          "title": "Learning Rate",
+          "type": "number"
+        },
+        "num_envs": {
+          "default": 1,
+          "title": "Num Envs",
+          "type": "integer"
+        },
+        "num_steps": {
+          "default": 2048,
+          "title": "Num Steps",
+          "type": "integer"
+        },
+        "anneal_lr": {
+          "default": false,
+          "title": "Anneal Lr",
+          "type": "boolean"
+        },
+        "gamma": {
+          "default": 0.995,
+          "title": "Gamma",
+          "type": "number"
+        },
+        "gae_lambda": {
+          "default": 0.95,
+          "title": "Gae Lambda",
+          "type": "number"
+        },
+        "num_minibatches": {
+          "default": 32,
+          "title": "Num Minibatches",
+          "type": "integer"
+        },
+        "update_epochs": {
+          "default": 10,
+          "title": "Update Epochs",
+          "type": "integer"
+        },
+        "norm_adv": {
+          "default": true,
+          "title": "Norm Adv",
+          "type": "boolean"
+        },
+        "clip_coef": {
+          "default": 0.2,
+          "title": "Clip Coef",
+          "type": "number"
+        },
+        "clip_vloss": {
+          "default": false,
+          "title": "Clip Vloss",
+          "type": "boolean"
+        },
+        "ent_coef": {
+          "default": 0.02,
+          "title": "Ent Coef",
+          "type": "number"
+        },
+        "vf_coef": {
+          "default": 0.5,
+          "title": "Vf Coef",
+          "type": "number"
+        },
+        "max_grad_norm": {
+          "default": 0.5,
+          "title": "Max Grad Norm",
+          "type": "number"
+        },
+        "target_kl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Kl"
+        }
+      },
+      "required": [
+        "total_timesteps"
+      ],
+      "title": "TrainingConfig",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "env_config": {
+      "$ref": "#/$defs/EnvConfig"
+    },
+    "training_config": {
+      "$ref": "#/$defs/TrainingConfig"
+    }
+  },
+  "required": [
+    "env_config",
+    "training_config"
+  ],
+  "title": "LearningConfig",
+  "type": "object"
+}

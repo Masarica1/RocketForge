@@ -1,0 +1,37 @@
+Diagnostics:
+  ClangTidy:
+    Add:
+      # 실제 버그 가능성이 높은 코드
+      - bugprone-*
+
+      # 성능상 실수
+      - performance-*
+
+      # Clang Static Analyzer
+      - clang-analyzer-*
+
+      # 유용한 modern C++ 권장사항
+      - modernize-use-nullptr
+      - modernize-use-override
+      - modernize-use-default-member-init
+      - modernize-use-emplace
+      - modernize-loop-convert
+
+      # 과하지 않은 readability
+      - readability-make-member-function-const
+      - readability-const-return-type
+      - readability-redundant-string-cstr
+
+    Remove:
+      - bugprone-easily-swappable-parameters
+
+---
+
+If:
+  PathMatch: .*[/\\]build[/\\].*
+
+Index:
+  Background: Skip
+
+Diagnostics:
+  Suppress: "*"

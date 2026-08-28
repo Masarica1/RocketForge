@@ -1,0 +1,292 @@
+import random
+
+import numpy as np
+import torch
+from gymnasium.vector import AutoresetMode, SyncVectorEnv
+from torch import Tensor, nn, optim
+from torch.distributions import Bernoulli, Independent
+
+from learning.agent.config_model import LearningConfig
+from learning.agent.logger import ProgressLogger, WandbLogger
+from learning.environment.mono_env import MonoEnv
+from learning.environment.typing import ACT_LENGTH, OBS_LENGTH
+from learning.environment.wrapper import Monitor
+
+
+def layer_init(layer: nn.Linear, std: float = np.sqrt(2), bias_const: float = 0.0) -> nn.Linear:
+    nn.init.orthogonal_(layer.weight, std)
+    nn.init.constant_(layer.bias, bias_const)
+    return layer
+
+
+class Network(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.critic = nn.Sequential(
+            layer_init(nn.Linear(OBS_LENGTH, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 1), std=1.0)
+        )
+        self.actor = nn.Sequential(
+            layer_init(nn.Linear(OBS_LENGTH, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, 64)),
+            nn.Tanh(),
+            layer_init(nn.Linear(64, ACT_LENGTH), std=0.01)
+        )
+
+    def get_value(self, x: Tensor) -> Tensor:
+        return self.critic(x)
+
+    def get_action(self, x: Tensor, deterministic: bool = False) -> Tensor:
+        logits = self.actor(x)
+
+        if deterministic:
+            return (logits>=0).to(torch.float32)
+
+        return Bernoulli(logits=logits).sample()
+
+    def get_action_and_value(self, x, action: Tensor|None=None) -> tuple[Tensor, Tensor, Tensor, Tensor]:
+        logits = self.actor(x)
+        probs = Independent(Bernoulli(logits=logits), 1)
+
+        if action is None:
+            action = probs.sample()
+        return action, probs.log_prob(action), probs.entropy(), self.critic(x)
+
+
+
+class Agent:
+    def __init__(self, learning_cfg: LearningConfig) -> None:
+
+        self.training_cfg = learning_cfg.training_config
+        self.env_cfg = learning_cfg.env_config
+        self.envs = SyncVectorEnv(
+            env_fns=[
+                lambda: Monitor(MonoEnv(
+                    timeout=self.env_cfg.timeout,
+                    action_period=self.env_cfg.action_period,
+                    randomize_initial_state=self.env_cfg.randomize_initial_state
+                ))
+                for _ in range(self.training_cfg.num_envs)
+            ],
+            autoreset_mode=AutoresetMode.SAME_STEP
+        )
+
+        # random settings
+        random.seed(self.env_cfg.seed)
+        np.random.seed(self.env_cfg.seed)
+        torch.manual_seed(self.env_cfg.seed if self.env_cfg.seed is not None else torch.seed())
+        torch.backends.cudnn.deterministic = self.env_cfg.torch_deterministic
+
+        self.network = Network().to(self.env_cfg.device)
+        self.optimizer = optim.Adam(self.network.parameters(), lr=self.training_cfg.lr, eps=1e-5)
+
+        self.logger = WandbLogger(learning_cfg, max_len=30) if self.env_cfg.wandb_project_name is not None else None
+        self.progress_bar = ProgressLogger(total=self.training_cfg.effective_timestep)  if self.env_cfg.progress_bar else None
+
+
+    def learn(self):
+        try:
+            if self.progress_bar:
+                self.progress_bar.start()
+
+            self._learn()
+        finally:
+            self.close()
+
+
+    def _learn(self):
+        assert self.envs.single_observation_space.shape is not None
+        assert self.envs.single_action_space.shape is not None
+
+        # aliases
+        batch_shape = (self.training_cfg.num_steps, self.training_cfg.num_envs)
+        device = self.env_cfg.device
+
+        # init
+        obs = torch.zeros(batch_shape + self.envs.single_observation_space.shape).to(device)
+        actions = torch.zeros(batch_shape + self.envs.single_action_space.shape).to(device)
+        logprobs = torch.zeros(batch_shape).to(device)
+        rewards = torch.zeros(batch_shape).to(device)
+        dones = torch.zeros(batch_shape).to(device)
+        values = torch.zeros(batch_shape).to(device)
+
+        next_obs, _ = self.envs.reset(seed=self.env_cfg.seed)
+        next_obs = torch.Tensor(next_obs).to(device)
+        next_done = torch.zeros(self.training_cfg.num_envs).to(device)
+
+        global_step = 0
+
+        for iteration in range(1, self.training_cfg.num_iterations + 1):
+            if self.training_cfg.anneal_lr:
+                frac = 1.0 - (iteration - 1.0) / self.training_cfg.num_iterations
+                lrnow = frac * self.training_cfg.lr
+                self.optimizer.param_groups[0]['lr'] = lrnow
+
+            for step in range(self.training_cfg.num_steps):
+                obs[step] = next_obs
+                dones[step] = next_done
+                
+                # ALGO LOGIC: action logic
+                with torch.no_grad():
+                    action, logprob, _, value = self.network.get_action_and_value(next_obs)
+                    values[step] = value.flatten()
+                actions[step] = action
+                logprobs[step] = logprob
+
+                # execute the game and log data
+                next_obs, reward, terminations, truncations, info = self.envs.step(action.cpu().numpy())
+                next_done = np.logical_or(terminations, truncations)
+                rewards[step] = torch.tensor(reward).to(device).view(-1)
+                next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
+
+                global_step += self.training_cfg.num_envs
+
+                if self.logger:
+                    self.logger.add_queue(info=info)
+                    self.logger.write_queue(global_step)
+                    self.logger.save_weights(self.network)
+                if self.progress_bar:
+                    self.progress_bar.update(completed=global_step)
+
+
+            # bootstrap value if not done
+            with torch.no_grad():
+                next_value = self.network.get_value(next_obs).reshape(1, -1)
+                advantages = torch.zeros_like(rewards).to(device)
+                lastgaelam = 0
+
+                for t in reversed(range(self.training_cfg.num_steps)):
+                    if t == self.training_cfg.num_steps - 1:
+                        nextnonterminal = 1.0 - next_done
+                        nextvalues = next_value
+                    else:
+                        nextnonterminal = 1.0 - dones[t + 1]
+                        nextvalues = values[t + 1]
+                    delta = rewards[t] + self.training_cfg.gamma * nextvalues * nextnonterminal - values[t]
+                    advantages[t] = lastgaelam = (
+                        delta
+                        + self.training_cfg.gamma
+                        * self.training_cfg.gae_lambda
+                        * nextnonterminal
+                        * lastgaelam
+                    )
+                returns = advantages + values
+
+            # flatten the batch
+            b_obs = obs.reshape((-1,) + self.envs.single_observation_space.shape)
+            b_logprobs = logprobs.reshape(-1)
+            b_actions = actions.reshape((-1,) + self.envs.single_action_space.shape)
+            b_advantages = advantages.reshape(-1)
+            b_returns = returns.reshape(-1)
+            b_values = values.reshape(-1)
+
+            # optimize the policy and value network
+            b_inds = np.arange(self.training_cfg.batch_size)
+            for _ in range(self.training_cfg.update_epochs):
+                approx_kl: Tensor|None = None
+                
+                np.random.shuffle(b_inds)
+                for start in range(0, self.training_cfg.batch_size, self.training_cfg.minibatch_size):
+                    end = start + self.training_cfg.minibatch_size
+                    mb_inds = b_inds[start:end]
+
+                    _, newlogprob, entropy, newvalue = self.network.get_action_and_value(
+                        b_obs[mb_inds],
+                        b_actions[mb_inds],
+                    )
+                    logratio = newlogprob - b_logprobs[mb_inds]
+                    ratio = logratio.exp()
+
+                    with torch.no_grad():
+                        approx_kl = ((ratio - 1) - logratio).mean()
+                        clip_frac = (
+                            (ratio - 1.0).abs() > self.training_cfg.clip_coef
+                        ).float().mean()
+
+                    mb_advantages = b_advantages[mb_inds]
+                    if self.training_cfg.norm_adv:
+                        mb_advantages = (mb_advantages - mb_advantages.mean()) / (
+                            mb_advantages.std() + 1e-8
+                        )
+
+                    # policy loss
+                    pg_loss1 = -mb_advantages * ratio
+                    pg_loss2 = -mb_advantages * torch.clamp(
+                        ratio,
+                        1 - self.training_cfg.clip_coef,
+                        1 + self.training_cfg.clip_coef,
+                    )
+                    pg_loss = torch.max(pg_loss1, pg_loss2).mean()
+
+                    # value loss
+                    newvalue = newvalue.view(-1)
+                    if self.training_cfg.clip_vloss:
+                        v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
+                        v_clipped = b_values[mb_inds] + torch.clamp(
+                            newvalue - b_values[mb_inds],
+                            -self.training_cfg.clip_coef,
+                            self.training_cfg.clip_coef,
+                        )
+                        v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
+                        v_loss = 0.5 * torch.max(v_loss_unclipped, v_loss_clipped).mean()
+                    else:
+                        v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
+
+                    entropy_loss = entropy.mean()
+                    loss = (
+                        pg_loss
+                        - self.training_cfg.ent_coef * entropy_loss
+                        + self.training_cfg.vf_coef * v_loss
+                    )
+
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    nn.utils.clip_grad_norm_(self.network.parameters(), self.training_cfg.max_grad_norm)
+                    self.optimizer.step()
+
+                    if (self.logger):
+                        self.logger.add_metric({
+                            'train/actor_loss': pg_loss.item(),
+                            'train/critic_loss': v_loss.item(),
+                            'train/entropy_loss': entropy_loss.item(),
+                            'train/total_loss': loss.item(),
+                            'train/approx_kl': approx_kl.item(),
+                            'train/clip_frac': clip_frac.item(),
+                        })
+
+                if (
+                    self.training_cfg.target_kl is not None
+                    and approx_kl is not None
+                    and approx_kl.item() > self.training_cfg.target_kl
+                ):
+                    break
+
+            y_pred = b_values.cpu().numpy()
+            y_true = b_returns.cpu().numpy()
+            var_y = np.var(y_true)
+            explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+
+            if (self.logger):
+                self.logger.add_metric({
+                    'value/target_std': returns.std().item(),
+                    'value/prediction_std': b_values.std().item(),
+                    'value/prediction_mean': b_values.mean().item(),
+                    'value/explained_variance': float(explained_var),
+
+                    'rollout/advantage_std': b_advantages.std().item(),
+                    'rollout/observation_std': b_obs.std(dim=0, correction=0).mean().item(),
+                    'rollout/step_reward_mean': rewards.mean().item()
+                })
+                self.logger.write_metric(step=global_step)
+
+    def close(self):
+        self.envs.close()
+
+        if self.logger:
+            self.logger.finish(module=self.network)
+        if self.progress_bar:
+            self.progress_bar.end()

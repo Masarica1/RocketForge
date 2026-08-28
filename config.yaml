@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=./schemas/learning-config.schema.json
+
+env_config:
+  exp_name: CleanRL-6
+  wandb_project_name: rocketforge
+  progress_bar: true
+
+  # randomness setting
+  seed: 10
+  randomize_initial_state: true
+  torch_deterministic: false
+
+  # env
+  timeout: 21600
+  action_period: 2
+  
+  # etc
+  device: cuda
+  
+
+training_config:
+  total_timesteps: 2000000
+  learning_rate: 0.0002
+  num_envs: 4
+  num_steps: 1024
+  anneal_lr: false
+  gamma: 0.995
+  gae_lambda: 0.95
+  num_minibatches: 16
+  update_epochs: 10
+  norm_adv: true
+  clip_coef: 0.2
+  clip_vloss: false
+  ent_coef: 0.02
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  target_kl: 0.006
