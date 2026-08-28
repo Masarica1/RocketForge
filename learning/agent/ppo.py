@@ -19,6 +19,40 @@ def layer_init(layer: nn.Linear, std: float = np.sqrt(2), bias_const: float = 0.
     return layer
 
 
+def compute_gae(
+    rewards: Tensor,
+    values: Tensor,
+    next_values: Tensor,
+    terminations: Tensor,
+    truncations: Tensor,
+    gamma: float,
+    gae_lambda: float,
+) -> tuple[Tensor, Tensor]:
+    advantages = torch.zeros_like(rewards)
+    lastgaelam = torch.zeros_like(rewards[0])
+
+    for t in reversed(range(rewards.shape[0])):
+        # A true termination has no successor value. A time-limit truncation
+        # does bootstrap from its final observation, but both signals stop the
+        # GAE trace so it cannot leak into the next episode.
+        bootstrap_nonterminal = 1.0 - terminations[t]
+        trace_nonterminal = 1.0 - torch.logical_or(
+            terminations[t].bool(), truncations[t].bool()
+        ).float()
+        delta = (
+            rewards[t]
+            + gamma * next_values[t] * bootstrap_nonterminal
+            - values[t]
+        )
+        lastgaelam = (
+            delta
+            + gamma * gae_lambda * trace_nonterminal * lastgaelam
+        )
+        advantages[t] = lastgaelam
+
+    return advantages, advantages + values
+
+
 class Network(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -111,12 +145,13 @@ class Agent:
         actions = torch.zeros(batch_shape + self.envs.single_action_space.shape).to(device)
         logprobs = torch.zeros(batch_shape).to(device)
         rewards = torch.zeros(batch_shape).to(device)
-        dones = torch.zeros(batch_shape).to(device)
+        terminations = torch.zeros(batch_shape).to(device)
+        truncations = torch.zeros(batch_shape).to(device)
         values = torch.zeros(batch_shape).to(device)
+        next_values = torch.zeros(batch_shape).to(device)
 
         next_obs, _ = self.envs.reset(seed=self.env_cfg.seed)
-        next_obs = torch.Tensor(next_obs).to(device)
-        next_done = torch.zeros(self.training_cfg.num_envs).to(device)
+        next_obs = torch.as_tensor(next_obs, dtype=torch.float32, device=device)
 
         global_step = 0
 
@@ -128,7 +163,6 @@ class Agent:
 
             for step in range(self.training_cfg.num_steps):
                 obs[step] = next_obs
-                dones[step] = next_done
                 
                 # ALGO LOGIC: action logic
                 with torch.no_grad():
@@ -138,10 +172,28 @@ class Agent:
                 logprobs[step] = logprob
 
                 # execute the game and log data
-                next_obs, reward, terminations, truncations, info = self.envs.step(action.cpu().numpy())
-                next_done = np.logical_or(terminations, truncations)
-                rewards[step] = torch.tensor(reward).to(device).view(-1)
-                next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
+                next_obs, reward, termination, truncation, info = self.envs.step(action.cpu().numpy())
+                done = np.logical_or(termination, truncation)
+                rewards[step] = torch.as_tensor(reward, dtype=torch.float32, device=device).view(-1)
+                terminations[step] = torch.as_tensor(termination, dtype=torch.float32, device=device)
+                truncations[step] = torch.as_tensor(truncation, dtype=torch.float32, device=device)
+
+                # SAME_STEP returns the reset observation for completed envs.
+                # Use final_obs instead when evaluating the transition's true
+                # successor, which is required to bootstrap truncations.
+                bootstrap_obs = np.array(next_obs, copy=True)
+                if np.any(done):
+                    final_obs = info.get('final_obs')
+                    final_obs_mask = info.get('_final_obs')
+                    if final_obs is None or final_obs_mask is None or not np.all(final_obs_mask[done]):
+                        raise RuntimeError('SyncVectorEnv did not provide final_obs for a completed environment')
+                    bootstrap_obs[done] = np.stack(final_obs[done])
+
+                with torch.no_grad():
+                    next_values[step] = self.network.get_value(
+                        torch.as_tensor(bootstrap_obs, dtype=torch.float32, device=device)
+                    ).flatten()
+                next_obs = torch.as_tensor(next_obs, dtype=torch.float32, device=device)
 
                 global_step += self.training_cfg.num_envs
 
@@ -152,29 +204,17 @@ class Agent:
                 if self.progress_bar:
                     self.progress_bar.update(completed=global_step)
 
-
-            # bootstrap value if not done
+            # Compute GAE with separate bootstrap and trace masks.
             with torch.no_grad():
-                next_value = self.network.get_value(next_obs).reshape(1, -1)
-                advantages = torch.zeros_like(rewards).to(device)
-                lastgaelam = 0
-
-                for t in reversed(range(self.training_cfg.num_steps)):
-                    if t == self.training_cfg.num_steps - 1:
-                        nextnonterminal = 1.0 - next_done
-                        nextvalues = next_value
-                    else:
-                        nextnonterminal = 1.0 - dones[t + 1]
-                        nextvalues = values[t + 1]
-                    delta = rewards[t] + self.training_cfg.gamma * nextvalues * nextnonterminal - values[t]
-                    advantages[t] = lastgaelam = (
-                        delta
-                        + self.training_cfg.gamma
-                        * self.training_cfg.gae_lambda
-                        * nextnonterminal
-                        * lastgaelam
-                    )
-                returns = advantages + values
+                advantages, returns = compute_gae(
+                    rewards=rewards,
+                    values=values,
+                    next_values=next_values,
+                    terminations=terminations,
+                    truncations=truncations,
+                    gamma=self.training_cfg.gamma,
+                    gae_lambda=self.training_cfg.gae_lambda,
+                )
 
             # flatten the batch
             b_obs = obs.reshape((-1,) + self.envs.single_observation_space.shape)
@@ -186,7 +226,8 @@ class Agent:
 
             # optimize the policy and value network
             b_inds = np.arange(self.training_cfg.batch_size)
-            for _ in range(self.training_cfg.update_epochs):
+            completed_update_epochs = 0
+            for update_epoch in range(self.training_cfg.update_epochs):
                 approx_kl: Tensor|None = None
                 
                 np.random.shuffle(b_inds)
@@ -248,7 +289,7 @@ class Agent:
                     nn.utils.clip_grad_norm_(self.network.parameters(), self.training_cfg.max_grad_norm)
                     self.optimizer.step()
 
-                    if (self.logger):
+                    if self.logger:
                         self.logger.add_metric({
                             'train/actor_loss': pg_loss.item(),
                             'train/critic_loss': v_loss.item(),
@@ -258,6 +299,7 @@ class Agent:
                             'train/clip_frac': clip_frac.item(),
                         })
 
+                completed_update_epochs = update_epoch + 1
                 if (
                     self.training_cfg.target_kl is not None
                     and approx_kl is not None
@@ -270,8 +312,10 @@ class Agent:
             var_y = np.var(y_true)
             explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
-            if (self.logger):
+            if self.logger:
                 self.logger.add_metric({
+                    'train/update_epochs': completed_update_epochs,
+
                     'value/target_std': returns.std().item(),
                     'value/prediction_std': b_values.std().item(),
                     'value/prediction_mean': b_values.mean().item(),
@@ -286,7 +330,7 @@ class Agent:
     def close(self):
         self.envs.close()
 
-        if self.logger:
-            self.logger.finish(module=self.network)
         if self.progress_bar:
             self.progress_bar.end()
+        if self.logger:
+            self.logger.finish(module=self.network)

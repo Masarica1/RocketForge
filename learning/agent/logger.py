@@ -39,8 +39,7 @@ class WandbLogger:
         self.max_len = max_len
 
         assert learning_cfg.env.wandb_project_name is not None
-        if (new_name := WandbLogger.check_name_overlap(learning_cfg.env.exp_name)) is not None:
-            learning_cfg.env.exp_name = new_name
+        learning_cfg.env.exp_name = WandbLogger.check_name_overlap(learning_cfg.env.exp_name)
 
         self.run = wandb.init(
             entity=None,
@@ -142,7 +141,7 @@ class WandbLogger:
         while display_name in previous_names:
             printer(
                 '[bold blue](Logger) [/]'
-                '[bold][yellow]WARNING[/]:[/] '
+                '[bold][yellow]WARNING[/]:[/]'
                 ' '
                 f'Run name {display_name} already exists in W&B'
                 '\n'
@@ -154,7 +153,7 @@ class WandbLogger:
                     break
                 case 'no':
                     printer(
-                        '[bold][blue](Logger) [/]'
+                        '[bold blue](Logger) [/]'
                         'Enter new name of run:',
                         end=' '
                     )
