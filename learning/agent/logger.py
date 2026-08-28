@@ -111,7 +111,7 @@ class WandbLogger:
                 )
 
                 
-    def finish(self, module: torch.nn.Module|None = None):
+    def finish(self, module: torch.nn.Module|None = None, summary_data: dict[str, Number]|None = None):
         if module:
             checkpoint_path = self.temp_dir / 'checkpoint' / 'checkpoint_end.pt'
             checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -124,6 +124,9 @@ class WandbLogger:
             )
 
         self.run.summary['benchmark/best_episode_length'] = self.best_episode_length
+        if summary_data:
+            self.run.summary.update(summary_data)
+
         self.run.finish()
 
 
@@ -140,12 +143,8 @@ class WandbLogger:
 
         while display_name in previous_names:
             printer(
-                '[bold blue](Logger) [/]'
-                '[bold][yellow]WARNING[/]:[/]'
-                ' '
-                f'Run name {display_name} already exists in W&B'
-                '\n'
-                'Do you want to overlap(yes) or change(no)?',
+                f'[bold blue](Logger)[/] [bold yellow]WARNING[/]: Run name {display_name} already exists in W&B\n'
+                '[bold blue](Logger)[/] Do you want to overlap(yes) or change(no)?',
                 end=' '
             )
             match input():
@@ -153,15 +152,13 @@ class WandbLogger:
                     break
                 case 'no':
                     printer(
-                        '[bold blue](Logger) [/]'
-                        'Enter new name of run:',
+                        '[bold blue](Logger)[/] Enter new name of run:',
                         end=' '
                     )
                     display_name = input()
                 case _:
                     printer(
-                        '[bold][blue](Logger) [/]'
-                        'you can only enter yes or no'
+                        '[bold][blue](Logger)[/] you can only enter yes or no'
                     )
 
         return display_name

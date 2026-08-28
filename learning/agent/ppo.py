@@ -117,6 +117,7 @@ class Agent:
 
         self.network = Network().to(self.env_cfg.device)
         self.optimizer = optim.Adam(self.network.parameters(), lr=self.training_cfg.lr, eps=1e-5)
+        self.optimizer_steps = 0
 
         self.logger = WandbLogger(learning_cfg, max_len=30) if self.env_cfg.wandb_project_name is not None else None
         self.progress_bar = ProgressLogger(total=self.training_cfg.effective_timestep)  if self.env_cfg.progress_bar else None
@@ -288,6 +289,7 @@ class Agent:
                     loss.backward()
                     nn.utils.clip_grad_norm_(self.network.parameters(), self.training_cfg.max_grad_norm)
                     self.optimizer.step()
+                    self.optimizer_steps += 1
 
                     if self.logger:
                         self.logger.add_metric({
@@ -333,4 +335,11 @@ class Agent:
         if self.progress_bar:
             self.progress_bar.end()
         if self.logger:
-            self.logger.finish(module=self.network)
+            self.logger.finish(
+                module=self.network,
+                summary_data={
+                    'config/max_optimizer_steps': self.training_cfg.max_optimizer_steps,
+                    'config/real_optimizer_steps': self.optimizer_steps
+                }
+            )
+        self.optimizer_steps = 0

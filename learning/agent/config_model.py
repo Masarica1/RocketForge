@@ -117,3 +117,7 @@ class TrainingConfig(BaseModel):
     @property
     def effective_timestep(self) -> int:
         return self.num_iterations * self.batch_size
+
+    @property
+    def max_optimizer_steps(self) -> int:
+        return self.num_minibatches * self.update_epochs * self.num_iterations
