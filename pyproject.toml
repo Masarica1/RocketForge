@@ -30,9 +30,9 @@ dev = [
 
 
 [project.scripts]
-hueristic-test = "learning.test.test:hueristic_test"
-training-test = "learning.test.test:training_test"
-model-test = "learning.test.test:model_test"
+hueristic-test = "learning.scripts.test:hueristic_test"
+training-test = "learning.scripts.test:training_test"
+model-test = "learning.scripts.test:model_test"
 
 train = 'learning.scripts.train:train'
 

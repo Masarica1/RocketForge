@@ -24,6 +24,9 @@ public:
     void addTorque(float t) {torque_ += t;}
     void setTorque(float t) {torque_ = t;}
 
+    void setLinearVel(Vec2 v) {velocity_ = v;}
+    void setAngularVel(float v) {angularVel_ = v;}
+
     void reset() {
         velocity_ = {0., 0.};
         force_ = {0., 0.};

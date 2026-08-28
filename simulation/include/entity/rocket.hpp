@@ -2,8 +2,8 @@
 #include <tuple>
 #include <random>
 #include <optional>
-#include <numbers>
 
+#include "constants.hpp"
 #include "rigidbody.hpp"
 #include "transform.hpp"
 #include "vec2.hpp"
@@ -54,7 +54,7 @@ public:
         transform_.rotate(rb_.angularVel() * dt);
     }
 
-    void reset(Vec2 spaceSize, std::optional<unsigned int> seed = std::nullopt) {
+    void reset(Vec2 spaceSize, constants::Randomness::Rocket randomness, std::optional<unsigned int> seed = std::nullopt) {
         transform_.setCenter(spaceSize / 2);
         transform_.angle = 0;
         rb_.reset();
@@ -62,9 +62,22 @@ public:
         if (seed.has_value()) {
             std::mt19937 rng(*seed);
             std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+            
+            Vec2 errorPos = {
+                randomness.initPosRatio.x * spaceSize.x * dist(rng),
+                randomness.initPosRatio.y * spaceSize.y * dist(rng)
+            };
+            float errorAngle = randomness.initAngle * dist(rng);
+            Vec2 errorLinearVel = {
+                randomness.initLinearVel.x * dist(rng),
+                randomness.initLinearVel.y * dist(rng)
+            };
+            float errorAngularVel = randomness.initAngularVel * dist(rng);
 
-            transform_.move({0.1f*spaceSize.x * dist(rng), 0.1f*spaceSize.y * dist(rng)});
-            transform_.rotate(60.0f * static_cast<float>(std::numbers::pi)/180 * dist(rng));
+            transform_.move(errorPos);
+            transform_.rotate(errorAngle);
+            rb_.setLinearVel(errorLinearVel);
+            rb_.setAngularVel(errorAngularVel);
         }
     }
 };

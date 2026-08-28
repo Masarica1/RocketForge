@@ -5,7 +5,7 @@
 
 #include "rocket.hpp"
 #include "transform.hpp"
-#include "physics.hpp"
+#include "constants.hpp"
 #include "vec2.hpp"
 
 namespace simulation {
@@ -17,16 +17,17 @@ private:
     Rocket rocket_ = {
         simulation::Transform({0., 0.}, {60, 60}),
         simulation::RigidBody(400, 400),
-        {5.25 * 4000, 3500, 800}
+        {5.25 * 4000, 4500, 800}
     };
-    Constants constants_ = {9.81, 1.0f / 120};
+    constants::Physics constants_ = {9.81, 1.0f / 120};
+    constants::Randomness randomness = {};
 
     const size_t timeoutStep_;
     size_t currentStep_ = 0;
 
 
 public:
-    Simulation(size_t timeoutStep, Constants constant = {})
+    Simulation(size_t timeoutStep, constants::Physics constant = {})
     : constants_(constant), timeoutStep_(timeoutStep)
     {
         reset();
@@ -36,7 +37,7 @@ public:
     const Rocket& rocket() const { return rocket_; }
 
     void reset(std::optional<unsigned int> seed = std::nullopt) {
-        rocket_.reset({(float) spaceSize_.width, (float) spaceSize_.height}, seed);
+        rocket_.reset({(float) spaceSize_.width, (float) spaceSize_.height}, randomness.rocket, seed);
         currentStep_ = 0;
     }
 

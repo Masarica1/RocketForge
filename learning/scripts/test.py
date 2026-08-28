@@ -71,7 +71,7 @@ def simulation_test(
             step_callback(sim.get_obs(), act, sim.get_reward_list(), sim.get_terminated(), sim.get_truncated())
 
         if sim.get_terminated():
-            sim.reset()
+            sim.reset(seed=int(np.random.default_rng().integers(0, 2**32)))
 
     sim.close()
 
