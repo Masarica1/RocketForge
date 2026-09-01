@@ -173,7 +173,7 @@ class ProgressLogger:
             TaskProgressColumn(text_format="[progress.percentage][{task.percentage:>3.0f}%]"),
             TextColumn("Elasped:"), TimeElapsedColumn(),
             TextColumn("ETA:"), TimeRemainingColumn(),
-            speed_estimate_period=360
+            speed_estimate_period=600
         )
         self.task_id: TaskID|None = None
 

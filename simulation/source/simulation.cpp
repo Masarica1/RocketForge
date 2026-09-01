@@ -19,6 +19,7 @@
 #include "renderer.hpp"
 #include "controller.hpp"
 #include "vec2.hpp"
+#include "missile.hpp"
 
 using namespace simulation;
 namespace py = pybind11;
@@ -59,21 +60,30 @@ public:
     }
 
     py::array_t<float> getObs() const {
-        py::array_t<float> obs(7);
+        py::array_t<float> obs(12);
         float* ptr = obs.mutable_data();
 
         const Rocket& rocket = sim_.rocket();
+        const Missile& missile = sim_.missile();
         const Size spaceSize = sim_.spaceSize();
         // pos
         ptr[0] = rocket.transform().pos.x / static_cast<float>(spaceSize.width);
         ptr[1] = rocket.transform().pos.y / static_cast<float>(spaceSize.height);
-        ptr[2] = std::tanh(rocket.rb().linearVel().x / 20);
-        ptr[3] = std::tanh(rocket.rb().linearVel().y / 20);
+        ptr[2] = std::tanh(rocket.rb().linearVel().x / 60);
+        ptr[3] = std::tanh(rocket.rb().linearVel().y / 60);
         
         // angle
         ptr[4] = std::sin(rocket.transform().angle);
         ptr[5] = std::cos(rocket.transform().angle);
         ptr[6] = std::tanh(rocket.rb().angularVel() / 5);
+
+        //missile
+        ptr[7] = missile.alive() ? 1 : 0;
+        ptr[8] = (missile.transform().centerX() - rocket.transform().centerX()) / static_cast<float>(spaceSize.width);
+        ptr[9] = (missile.transform().centerY() - rocket.transform().centerY()) / static_cast<float>(spaceSize.height);
+        ptr[10] = std::tanh((missile.rb().linearVel().x - rocket.rb().linearVel().x) / 180);
+        ptr[11] = std::tanh((missile.rb().linearVel().y - rocket.rb().linearVel().y) / 180);
+
         return obs;
     }
 
@@ -85,15 +95,19 @@ public:
         return sim_.isTruncated();
     }
 
-    std::array<float, 4> getRewardList() const {
+    std::array<float, 5> getRewardList() const {
+        float spaceDiagonal = std::sqrt(static_cast<float>(sim_.spaceSize().width*sim_.spaceSize().width + sim_.spaceSize().height*sim_.spaceSize().height));
+
         float xRatio = sim_.rocket().transform().centerX() / static_cast<float>(sim_.spaceSize().width);
         float yRatio = sim_.rocket().transform().centerY() / static_cast<float>(sim_.spaceSize().height);
+        float missileDistRatio = (sim_.rocket().transform().center() - sim_.missile().transform().center()).length() / spaceDiagonal;
 
-        std::array<float, 4> reward = {
+        std::array<float, 5> reward = {
             1.0f,
             0.5f - 2 * std::fabs(0.5f - xRatio),
             0.5f - 2 * std::fabs(0.5f - yRatio),
-            0.5f * std::cos(sim_.rocket().transform().angle),
+            0.25f * std::cos(sim_.rocket().transform().angle),
+            sim_.missile().alive() ? 0.5f * (missileDistRatio - 0.5f) : 0.0f
         };
         return reward;
     }

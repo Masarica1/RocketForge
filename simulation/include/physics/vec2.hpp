@@ -11,7 +11,6 @@ struct Size {
     size_t height;
 };
 
-
 struct Vec2 {
     float x;
     float y;
@@ -33,8 +32,8 @@ struct Vec2 {
     Vec2 operator - (Vec2 other) const {
         return {x - other.x, y - other.y};
     }
-    float operator * (Vec2 other) const {
-        return x * other.x + y * other.y;
+    Vec2 operator * (Vec2 other) const {
+        return {x * other.x, y * other.y};
     }
     Vec2 operator * (float num) const {
         return {x * num, y * num };
@@ -71,6 +70,10 @@ struct Vec2 {
         return {-x, -y};
     }
 };
+
+inline float dot(Vec2 v1, Vec2 v2) {
+    return v1.x * v2.x + v1.y * v2.y;
+}
 
 
 }

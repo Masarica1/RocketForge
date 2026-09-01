@@ -6,6 +6,7 @@
 #include <raylib.h>
 
 #include "simulation.hpp"
+#include "transform.hpp"
 #include "vec2.hpp"
 
 namespace simulation::frontend {
@@ -24,6 +25,7 @@ private:
         LoadTexture("asset/rocket/rocket-110.png"),
         LoadTexture("asset/rocket/rocket-111.png"),
     };
+    Texture2D missileTexture = LoadTexture("asset/missile/missile.png");
     Texture2D bgTexture = LoadTexture("asset/background/background.png");
 
     ResourceManager() = default;
@@ -33,6 +35,7 @@ private:
             UnloadTexture(t);
         }
         UnloadTexture(bgTexture);
+        UnloadTexture(missileTexture);
     }
 
 public:
@@ -46,6 +49,10 @@ public:
         return rocketTextures[index];
     }
 
+    Texture2D getMissileTexture() {
+        return missileTexture;
+    }
+
     Texture2D getBackgroundTexture() {
         return bgTexture;
     }
@@ -54,6 +61,24 @@ public:
     ResourceManager& operator = (const ResourceManager&) = delete;
 
 };
+
+std::tuple<Rectangle, float> convertCoordination(Size windowSize, Size spaceSize, const simulation::Transform& transform) {
+    float magnification = static_cast<float>(windowSize.width) / static_cast<float>(spaceSize.width);
+
+    float x = transform.pos.x * magnification;
+    float y =(static_cast<float>(spaceSize.height) - transform.top()) * magnification;
+    float anlge = - transform.angle * RAD2DEG;
+
+    Vec2 size = transform.size * magnification;
+    return {Rectangle(x, y, size.x, size.y), anlge};
+}
+
+void drawEntity(Rectangle destination, float angle, Texture2D texture) {
+    Rectangle source = {0.0f, 0.0f, (float) texture.width, (float) texture.height};
+    Vector2 origin = {destination.width / 2, destination.height / 2};
+
+    DrawTexturePro(texture, source, destination, origin, angle, WHITE);
+}
 
 }
 
@@ -67,10 +92,13 @@ void render(
 
     BeginDrawing();;
 
-    float magnification = static_cast<float>(windowSize.width) / static_cast<float>(sim.spaceSize().width);
-    Texture2D backgroundTexture = ResourceManager::get().getBackgroundTexture();
+    auto drawer = [windowSize, spaceSize = sim.spaceSize()](const Transform& transform, Texture2D texture) {
+        auto [rectDest, angle] = convertCoordination(windowSize, spaceSize, transform);
+        drawEntity(rectDest, angle, texture);
+    };
 
     // draw background
+    Texture2D backgroundTexture = ResourceManager::get().getBackgroundTexture();
     DrawTexturePro(
         backgroundTexture,
         {0., 0., (float) backgroundTexture.width, (float) backgroundTexture.height},
@@ -86,16 +114,11 @@ void render(
         4*static_cast<int>(leftAct)+2*static_cast<int>(mainAct)+static_cast<int>(rightAct)
     );
 
-    float rocketX = sim.rocket().transform().pos.x * magnification;
-    float rocketY = (static_cast<float>(sim.spaceSize().height) - sim.rocket().transform().top()) * magnification;
-    float rocketAngle = -sim.rocket().transform().angle * RAD2DEG;
-    Vec2 rocketSize = sim.rocket().transform().size * magnification;
-    Vec2 rocketCenter = Vec2(rocketX, rocketY) + rocketSize / 2;
-
-    Rectangle rocketSource = {0., 0., (float) rocketTexture.width, (float) rocketTexture.height};
-    Rectangle rocketDest = {rocketX, rocketY, rocketSize.x, rocketSize.y};
-    DrawTexturePro(rocketTexture, rocketSource, rocketDest, {rocketSize.x/2, rocketSize.y/2}, rocketAngle, WHITE);
-
+    drawer(sim.rocket().transform(), rocketTexture);
+    if (sim.missile().alive()) {
+        drawer(sim.missile().transform(), ResourceManager::get().getMissileTexture());
+    }
+    
     EndDrawing();
 }
 

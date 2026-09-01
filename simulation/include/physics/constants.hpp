@@ -20,9 +20,11 @@ struct Randomness {
     };
 
     struct Missile {
-        Vec2 initPosError = {0.20, 0.20};
-        float minLinearVel = 100;
-        float maxLinearVel = 200;
+        Vec2 targetPosError = {75, 75};
+        float minLinearVel = 50;
+        float maxLinearVel = 150;
+        int minRespawnTime = 1;
+        int maxRespawnTime = 4;
     };
 
     Rocket rocket = {};

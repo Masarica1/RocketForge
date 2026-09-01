@@ -47,6 +47,26 @@ struct Transform {
     void move(Vec2 vec) { pos += vec; }
     void rotate(float angle) { this->angle += angle; }
 
+    void setTop(float y) {
+        pos.y = y - size.y;
+    }
+    void setBottom(float y) {
+        pos.y = y;
+    }
+    void setRight(float x) {
+        pos.x = x - size.x;
+    }
+    void setLeft(float x) {
+        pos.x = x;
+    }
+
+    void setCenterX(float x) {
+        pos.x = x - 0.5f * size.x;
+    }
+    void setCenterY(float y) {
+        pos.y = y - 0.5f * size.y;
+    }
+
     // utils units
     Vec2 rightUnit() const {
         return {std::cos(angle), std::sin(angle)};

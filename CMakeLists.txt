@@ -34,12 +34,20 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
+## nlohmann_json
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
 # include
 include_directories(
     simulation/include/physics
     simulation/include/frontend
     simulation/include/entity
+    simulation/include/utils
 )
 
 # make
@@ -47,10 +55,13 @@ include_directories(
 pybind11_add_module(
     simulation
     simulation/source/simulation.cpp
+    simulation/source/entity/missile.cpp
+    simulation/source/utils/json.cpp
+    simulation/source/physics/collide.cpp
 )
 target_link_libraries(
     simulation
-    PRIVATE raylib
+    PRIVATE raylib nlohmann_json
 )
 set_target_properties(
     simulation PROPERTIES

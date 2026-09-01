@@ -34,7 +34,7 @@ def make_mdp_table(obs: ObsType, rewards: list[float]) -> Table:
 
     # rows
     ## obs
-    table.add_row('[bold cyan]Observation[/bold cyan]', '')
+    table.add_row('[bold cyan]Obs: Rocket[/bold cyan]', '')
     table.add_row('pos_x', f'{obs[0]:.3f}')
     table.add_row('pos_y', f'{obs[1]:.3f}')
     table.add_row('vel_x', f'{obs[2]:.3f}')
@@ -42,6 +42,12 @@ def make_mdp_table(obs: ObsType, rewards: list[float]) -> Table:
     table.add_row('sin', f'{obs[4]:.3f}')
     table.add_row('cos', f'{obs[5]:.3f}')
     table.add_row('ang_vel', f'{obs[6]:.3f}', end_section=True)
+    table.add_row('[bold cyan]Obs: Missile[/bold cyan]', '')
+    table.add_row('alive', f'{bool(obs[7])}')
+    table.add_row('pos_x', f'{obs[8]: .3f}')
+    table.add_row('pos_y', f'{obs[9]: .3f}')
+    table.add_row('vel_x', f'{obs[10]: .3f}')
+    table.add_row('vel_y', f'{obs[11]: .3f}', end_section=True)
 
     ## reward
     table.add_row('[bold cyan]Reward[/bold cyan]', '')
@@ -49,6 +55,7 @@ def make_mdp_table(obs: ObsType, rewards: list[float]) -> Table:
     table.add_row('x_ratio', f'{rewards[1]:.3f}')
     table.add_row('y_ratio', f'{rewards[2]:.3f}')
     table.add_row('ang', f'{rewards[3]:.3f}')
+    table.add_row('missile', f'{rewards[4]:.3f}')
  
     return table
 
@@ -72,7 +79,7 @@ def simulation_test(
         if step_callback is not None:
             step_callback(sim.get_obs(), act, sim.get_reward_list(), sim.get_terminated(), sim.get_truncated())
 
-        if sim.get_terminated():
+        if sim.get_terminated() or sim.get_truncated():
             sim.reset(seed=int(np.random.default_rng().integers(0, 2**32)))
 
     sim.close()
