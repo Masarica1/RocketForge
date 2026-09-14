@@ -2,7 +2,7 @@
 #include <cmath>
 #include <numbers>
 
-#include "vec2.hpp"
+#include "core/math/vec2.hpp"
 
 
 namespace simulation {

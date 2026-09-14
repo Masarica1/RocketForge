@@ -1,14 +1,13 @@
 #pragma once
-
 #include <numbers>
 
-#include "vec2.hpp"
+#include "core/math/vec2.hpp"
 
-namespace simulation::constants {
+namespace simulation::config {
 
-struct Physics {
-    float gravity = 9.81;
-    float dt = 1.0 / 120;
+struct PhysicsConfig {
+    float g = -9.81;
+    float dt = 1.0f / 120.0f;
 };
 
 struct Randomness {
@@ -31,7 +30,10 @@ struct Randomness {
     Missile missile = {};
 };
 
-
-
+struct WorldConfig {
+    SizeInt spaceSize;
+    PhysicsConfig physics = {};
+    Randomness random = {};
+};
 
 }

@@ -47,36 +47,12 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 # include
 include_directories(
-    simulation/include/physics
-    simulation/include/frontend
-    simulation/include/entity
-    simulation/include/utils
+    simulation
+    simulation/include/
 )
 
 # make
 ## python module
-pybind11_add_module(
-    simulation
-    simulation/source/simulation.cpp
-    simulation/source/entity/missile.cpp
-    simulation/source/utils/json.cpp
-    simulation/source/physics/collide.cpp
-)
-target_link_libraries(
-    simulation
-    PRIVATE raylib nlohmann_json
-)
-set_target_properties(
-    simulation PROPERTIES
-    PREFIX ""
-    SUFFIX ".pyd"
-)
-
-# post process
-add_custom_command(
-    TARGET simulation
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "$<TARGET_FILE:simulation>"
-    "${CMAKE_SOURCE_DIR}/learning/simulation/$<TARGET_FILE_NAME:simulation>"
+add_library(simulation STATIC
+    simulation/source/dummy.cpp
 )

@@ -1,15 +1,8 @@
 #pragma once
 #include <cmath>
-#include <cstddef>
-
 
 namespace simulation {
 
-
-struct Size {
-    size_t width;
-    size_t height;
-};
 
 struct Vec2 {
     float x;
@@ -74,6 +67,15 @@ struct Vec2 {
 inline float dot(Vec2 v1, Vec2 v2) {
     return v1.x * v2.x + v1.y * v2.y;
 }
+
+struct SizeInt {
+    size_t width;
+    size_t height;
+
+    Vec2 toVec() const {
+        return {static_cast<float>(width), static_cast<float>(height)};
+    }
+};
 
 
 }
