@@ -1,12 +1,12 @@
 # yaml-language-server: $schema=./schemas/learning-config.schema.json
 
 env_config:
-  exp_name: MS-6
+  exp_name: Run-2.0
   wandb_project_name: rocketforge
   progress_bar: true
 
   # randomness setting
-  seed: 111
+  seed: 1
   randomize_initial_state: true
   torch_deterministic: false
 
@@ -17,13 +17,16 @@ env_config:
   # etc
   device: cuda
   
-  
 training_config:
-  total_timesteps: 20000000
-  learning_rate: 0.0003
+  total_timesteps: 50000000
+  learning_rate:
+    type: linear
+    start_value: 0.0003
+    end_value: 0.00001
+    end_ratio: 0.75
+     
   num_envs: 8
   num_steps: 256
-  anneal_lr: true
   gamma: 0.995
   gae_lambda: 0.95
   num_minibatches: 16

@@ -12,6 +12,7 @@ requires-python = ">=3.12"
 dependencies = [
     "gymnasium>=1.3.0",
     "jaxtyping>=0.3.11",
+    "matplotlib>=3.11.1",
     "numpy>=2.5.2",
     "pydantic>=2.13.4",
     "pyyaml>=6.0.3",
@@ -52,8 +53,9 @@ build-dir = "build/skbuild/{wheel_tag}"
 cache-keys = [
     { file = "pyproject.toml" },
     { file = "CMakeLists.txt" },
-    { file = "simulation/**/*.cpp" },
-    { file = "simulation/**/*.hpp" },
+    { file = "simulation_v1/CMakeLists.txt" },
+    { file = "simulation_v1/**/*.cpp" },
+    { file = "simulation_v1/**/*.hpp" },
 ]
 
 

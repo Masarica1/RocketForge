@@ -1,5 +1,6 @@
 #include <cmath>
 #include <vector>
+#include <limits>
 #include <algorithm>
 
 #include "transform.hpp"
@@ -44,31 +45,28 @@ bool isCollide(const std::vector<Vec2>& polygon1, const std::vector<Vec2>& polyg
     addEdges(polygon1);
     addEdges(polygon2);
 
-    for (const auto& edge: edges) {
+    for (const Vec2& edge: edges) {
         Vec2 normalVector = {edge.y, -edge.x};
 
-        std::vector<float> projectedA = {};
-        projectedA.reserve(polygon1.size());
-        for (const auto& vertice: polygon1) {
-            projectedA.push_back(dot(normalVector, vertice));
+        float minA = std::numeric_limits<float>::max();
+        float maxA = std::numeric_limits<float>::lowest();
+        float minB = std::numeric_limits<float>::max();
+        float maxB = std::numeric_limits<float>::lowest();
+
+        for (const Vec2& vertice: polygon1) {
+            float projectedVal = dot(normalVector, vertice);
+            minA = std::min(minA, projectedVal);
+            maxA = std::max(maxA, projectedVal);
         }
-
-        std::vector<float> projectedB = {};
-        projectedB.reserve(polygon2.size());
-        for (const auto& vertice : polygon2) {
-            projectedB.push_back(dot(normalVector, vertice));
+        for (const Vec2& vertice: polygon2) {
+            float projectedVal = dot(normalVector, vertice);
+            minB = std::min(minB, projectedVal);
+            maxB = std::max(maxB, projectedVal);
         }
-
-        auto minmaxA = std::minmax_element(projectedA.begin(), projectedA.end());
-        float minA = *(minmaxA.first);
-        float maxA = *(minmaxA.second);
-
-        auto minmaxB = std::minmax_element(projectedB.begin(), projectedB.end());
-        float minB = *(minmaxB.first);
-        float maxB = *(minmaxB.second);
 
         if (maxA <= minB || maxB <= minA) return false;
     }
+
     return true;
 
 }

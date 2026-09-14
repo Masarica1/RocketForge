@@ -13,6 +13,11 @@
 
 namespace simulation {
 
+enum class EpisodeState {
+    Alive = 0,
+    OutOfBound = 1, MissileCollision = 2,
+    Timeout = 3
+};
 
 class Simulation {
 private:
@@ -59,7 +64,7 @@ public:
         missile_.update(constants_.dt, spaceSize_, rocket_.transform().center(), randomness_.missile);
     }
 
-    bool isTerminated() const {
+    EpisodeState episodeState() const {
         const Transform& tf = rocket_.transform();
         if (
             tf.right() < 0
@@ -67,7 +72,7 @@ public:
             || tf.top() < 0
             || tf.bottom() > static_cast<float>(spaceSize_.height)
         ) {
-            return true;
+            return EpisodeState::OutOfBound;
         }
 
         if (
@@ -77,15 +82,14 @@ public:
                 missile_.transform(), missile_.polygon()
             )
         ) {
-            return true;
+            return EpisodeState::MissileCollision;
         }
 
+        if (currentStep_ >= timeoutStep_) {
+            return EpisodeState::Timeout;
+        }
 
-        return false;
-    }
-
-    bool isTruncated() const {
-        return timeoutStep_ <= currentStep_;
+        return EpisodeState::Alive;
     }
 };
 

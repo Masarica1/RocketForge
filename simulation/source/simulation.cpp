@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <numeric>
+#include <numbers>
 #include <cstddef>
 #include <stdexcept>
 #include <tuple>
@@ -13,6 +15,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/cast.h>
 #include <pybind11/stl.h>
+#include <pybind11/native_enum.h>
 #include <raylib.h>
 
 #include "simulation.hpp"
@@ -87,42 +90,49 @@ public:
         return obs;
     }
 
-    bool getTerminated() const {
-        return sim_.isTerminated();
+    EpisodeState getEpisodeState() const {
+        return sim_.episodeState();
     }
 
-    bool getTruncated() const {
-        return sim_.isTruncated();
-    }
-
-    std::array<float, 5> getRewardList() const {
+    std::array<float, 6> getRewardList() const {
         float spaceDiagonal = std::sqrt(static_cast<float>(sim_.spaceSize().width*sim_.spaceSize().width + sim_.spaceSize().height*sim_.spaceSize().height));
 
         float xRatio = sim_.rocket().transform().centerX() / static_cast<float>(sim_.spaceSize().width);
         float yRatio = sim_.rocket().transform().centerY() / static_cast<float>(sim_.spaceSize().height);
+        float angularVel = std::fabs(sim_.rocket().rb().angularVel());
         float missileDistRatio = (sim_.rocket().transform().center() - sim_.missile().transform().center()).length() / spaceDiagonal;
 
-        std::array<float, 5> reward = {
-            1.0f,
-            0.5f - 2 * std::fabs(0.5f - xRatio),
-            0.5f - 2 * std::fabs(0.5f - yRatio),
-            0.25f * std::cos(sim_.rocket().transform().angle),
-            sim_.missile().alive() ? 0.5f * (missileDistRatio - 0.5f) : 0.0f
+        std::array<float, 6> reward = {
+            2.0f,
+            (0.5f - 2 * std::fabs(0.5f - xRatio)) * 0.5f,
+            (0.5f - 2 * std::fabs(0.5f - yRatio)) * 0.5f,
+            0.125f * std::cos(sim_.rocket().transform().angle),
+            std::min(0.0f, 0.2f * static_cast<float>(std::tanh(std::numbers::pi - angularVel))),
+            sim_.missile().alive() ? 1.5f * (missileDistRatio - 0.5f) : 0.0f
         };
         return reward;
     }
 
 
     float getReward() const {
-        auto list = getRewardList();
+        using ES = simulation::EpisodeState;
 
-        if (!getTerminated()) {
-            return std::accumulate(list.begin(), list.end(), 0.0f) / 10;
+        switch (getEpisodeState()) {
+            case ES::Alive:
+            case ES::Timeout: {
+                auto list = getRewardList();
+                return std::accumulate(list.begin(), list.end(), 0.0f) / 10;
+            }
+
+            case ES::OutOfBound:
+            return -10.0f;
+
+            case ES::MissileCollision:
+            return -30.0f;
+            
+            default:
+            throw std::logic_error("Unknown EpisodeState");
         }
-        else {
-            return -10;
-        }
-        
     }
 
     void step(const py::array_t<int>& action) {
@@ -148,7 +158,7 @@ public:
                 renderingQueue.emplace(sim_, cppAction);
             }
 
-            if (sim_.isTerminated() || sim_.isTruncated()) return;
+            if (sim_.episodeState() != EpisodeState::Alive) return;
         }
     }
 
@@ -189,14 +199,20 @@ PYBIND11_MODULE(simulation, m) {
             py::arg("timeout"), py::arg("action_period") = 2, py::arg("window_size") = std::nullopt
         )
         .def("get_obs", &PythonSimulation::getObs)
-        .def("get_terminated", &PythonSimulation::getTerminated)
-        .def("get_truncated", &PythonSimulation::getTruncated)
+        .def("get_episode_state", &PythonSimulation::getEpisodeState)
         .def("get_reward_list", &PythonSimulation::getRewardList)
         .def("get_reward", &PythonSimulation::getReward)
         .def("step", &PythonSimulation::step, py::arg("action"))
         .def("reset", &PythonSimulation::reset, py::arg("seed") = std::nullopt)
         .def("render", &PythonSimulation::render)
         .def("close", &PythonSimulation::close);
+
+    py::native_enum<EpisodeState>(m, "EpisodeState", "enum.IntEnum")
+        .value("Alive", EpisodeState::Alive)
+        .value("OutOfBound", EpisodeState::OutOfBound)
+        .value("MissileCollision", EpisodeState::MissileCollision)
+        .value("Timeout", EpisodeState::Timeout)
+        .finalize();
 
     m.def("get_action_from_keyboard", &frontend::getActionFromKeyboard);
     m.def("window_should_close", &WindowShouldClose);

@@ -1,6 +1,8 @@
-from typing import Annotated, Any, Literal
+from typing import Annotated
 
 from pydantic import BaseModel, Field, computed_field, model_validator
+
+from learning.utils.func import LearningRate
 
 
 class LearningConfig(BaseModel):
@@ -15,8 +17,6 @@ class LearningConfig(BaseModel):
     def training(self):
         return self.training_config
 
-    def config_dump(self, mode: Literal['python', 'json'] = 'json') -> dict[str, Any]:
-        return self.env.model_dump(mode=mode) | self.training.model_dump(mode=mode)
 
 
 class EnvConfig(BaseModel):
@@ -51,14 +51,12 @@ class TrainingConfig(BaseModel):
     total_timesteps: int
     """total timesteps of the experiments"""
 
-    learning_rate: float = 2e-4
+    learning_rate: Annotated[LearningRate, Field(discriminator='type')]
     """the learning rate of the optimizer"""
     num_envs: int = 1
     """the number of parallel game environments"""
     num_steps: int = 2048
     """the number of steps to run in each environment per policy rollout"""
-    anneal_lr: bool = False
-    """Toggle learning rate annealing for policy and value networks"""
     gamma: float = 0.995
     """the discount factor gamma"""
 
@@ -94,10 +92,7 @@ class TrainingConfig(BaseModel):
         assert batch_size % self.num_minibatches == 0
         return self
 
-    @property
-    def lr(self) -> float:
-        return self.learning_rate
-
+    
     @computed_field
     @property
     def batch_size(self) -> int:

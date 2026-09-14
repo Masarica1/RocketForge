@@ -5,6 +5,7 @@ import numpy as np
 from gymnasium import spaces
 
 from learning.environment.typing import OBS_LENGTH, ActType, ObsType
+from learning.simulation.simulation import EpisodeState as ES
 from learning.simulation.simulation import Simulation
 
 
@@ -29,7 +30,15 @@ class MonoEnv(gym.Env[ObsType, ActType]):
     def step(self, action: ActType) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         self.sim.step(action)
 
-        return self.sim.get_obs(), self.sim.get_reward(), self.sim.get_terminated(), self.sim.get_truncated(), {}
+        current_state = ES(int(self.sim.get_episode_state()))
+
+        return (
+            self.sim.get_obs(),
+            self.sim.get_reward(),
+            current_state in [ES.MissileCollision, ES.OutOfBound],
+            current_state == ES.Timeout,
+            {'state': current_state}
+        )
 
     @override
     def reset(self, *, seed: int|None = None, options: dict[str, Any]|None = None) -> tuple[ObsType, dict[str, Any]]:

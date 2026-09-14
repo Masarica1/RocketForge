@@ -21,6 +21,7 @@ from wandb.apis.public import Run
 from learning.agent.ppo import Network
 from learning.environment.mono_env import MonoEnv
 from learning.environment.typing import ActType, ObsType
+from learning.simulation.simulation import EpisodeState as ES
 from learning.simulation.simulation import Simulation as Sim
 from learning.simulation.simulation import get_action_from_keyboard, window_should_close
 
@@ -55,7 +56,8 @@ def make_mdp_table(obs: ObsType, rewards: list[float]) -> Table:
     table.add_row('x_ratio', f'{rewards[1]:.3f}')
     table.add_row('y_ratio', f'{rewards[2]:.3f}')
     table.add_row('ang', f'{rewards[3]:.3f}')
-    table.add_row('missile', f'{rewards[4]:.3f}')
+    table.add_row('ang_vel', f'{rewards[4]:.3f}')
+    table.add_row('missile', f'{rewards[5]:.3f}')
  
     return table
 
@@ -76,10 +78,12 @@ def simulation_test(
         sim.step(action=act)
         sim.render()
 
-        if step_callback is not None:
-            step_callback(sim.get_obs(), act, sim.get_reward_list(), sim.get_terminated(), sim.get_truncated())
+        sim_state = sim.get_episode_state()
 
-        if sim.get_terminated() or sim.get_truncated():
+        if step_callback is not None:
+            step_callback(sim.get_obs(), act, sim.get_reward_list(), sim_state in [ES.MissileCollision, ES.OutOfBound], sim_state == ES.Timeout)
+
+        if sim_state != ES.Alive:
             sim.reset(seed=int(np.random.default_rng().integers(0, 2**32)))
 
     sim.close()

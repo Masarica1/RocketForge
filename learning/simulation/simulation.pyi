@@ -1,7 +1,14 @@
+from enum import IntEnum
 from typing import Annotated, SupportsInt
 
 import numpy
 from numpy.typing import ArrayLike, NDArray
+
+class EpisodeState(IntEnum):
+    Alive = 0
+    OutOfBound = 1
+    MissileCollision = 2
+    Timeout = 3
 
 class Simulation:
     def __init__(
@@ -12,8 +19,7 @@ class Simulation:
     ) -> None: ...
 
     def get_obs(self) -> NDArray[numpy.float32]: ...
-    def get_terminated(self) -> bool: ...
-    def get_truncated(self) -> bool: ...
+    def get_episode_state(self) -> EpisodeState: ...
     def get_reward_list(self) -> list[float]: ...
     def get_reward(self) -> float: ...
     

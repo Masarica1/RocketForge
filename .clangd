@@ -24,6 +24,7 @@ Diagnostics:
 
     Remove:
       - bugprone-easily-swappable-parameters
+      - performance-enum-size
 
 ---
 

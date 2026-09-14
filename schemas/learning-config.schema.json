@@ -1,5 +1,26 @@
 {
   "$defs": {
+    "Constant": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "constant",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "exclusiveMinimum": 0.0,
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "title": "Constant",
+      "type": "object"
+    },
     "EnvConfig": {
       "properties": {
         "exp_name": {
@@ -52,11 +73,13 @@
         },
         "timeout": {
           "default": 21600,
+          "exclusiveMinimum": 0,
           "title": "Timeout",
           "type": "integer"
         },
         "action_period": {
           "default": 2,
+          "exclusiveMinimum": 0,
           "title": "Action Period",
           "type": "integer"
         }
@@ -67,6 +90,41 @@
       "title": "EnvConfig",
       "type": "object"
     },
+    "Linear": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "linear",
+          "title": "Type",
+          "type": "string"
+        },
+        "start_value": {
+          "minimum": 0.0,
+          "title": "Start Value",
+          "type": "number"
+        },
+        "end_value": {
+          "minimum": 0.0,
+          "title": "End Value",
+          "type": "number"
+        },
+        "end_ratio": {
+          "description": "Training progress ratio at which end_value is reached",
+          "exclusiveMinimum": 0.0,
+          "maximum": 1.0,
+          "title": "End Ratio",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "start_value",
+        "end_value",
+        "end_ratio"
+      ],
+      "title": "Linear",
+      "type": "object"
+    },
     "TrainingConfig": {
       "properties": {
         "total_timesteps": {
@@ -74,9 +132,22 @@
           "type": "integer"
         },
         "learning_rate": {
-          "default": 0.0002,
-          "title": "Learning Rate",
-          "type": "number"
+          "discriminator": {
+            "mapping": {
+              "constant": "#/$defs/Constant",
+              "linear": "#/$defs/Linear"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Constant"
+            },
+            {
+              "$ref": "#/$defs/Linear"
+            }
+          ],
+          "title": "Learning Rate"
         },
         "num_envs": {
           "default": 1,
@@ -87,11 +158,6 @@
           "default": 2048,
           "title": "Num Steps",
           "type": "integer"
-        },
-        "anneal_lr": {
-          "default": false,
-          "title": "Anneal Lr",
-          "type": "boolean"
         },
         "gamma": {
           "default": 0.995,
@@ -157,7 +223,8 @@
         }
       },
       "required": [
-        "total_timesteps"
+        "total_timesteps",
+        "learning_rate"
       ],
       "title": "TrainingConfig",
       "type": "object"

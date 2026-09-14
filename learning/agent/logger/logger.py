@@ -1,15 +1,17 @@
 import atexit
 import shutil
-from collections import deque
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import wandb
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from rich import print as printer
 from rich.progress import (
     BarColumn,
@@ -23,6 +25,8 @@ from rich.progress import (
 from wandb.apis.public import Run, Runs
 
 from learning.agent.config_model import LearningConfig
+from learning.agent.logger.collector import LogCollector, QueueCollector
+from learning.utils.timer import Timer
 
 Number = int|float
 
@@ -30,14 +34,8 @@ GYM_KEYS: Final = ('episode_length', 'episode_reward')
 WANDB_TEMP_DIR: Final = Path('./logs/temp/')
 
 class WandbLogger:
-    def __init__(self, learning_cfg: LearningConfig, max_len: int = 15) -> None:
-        self.metric: dict[str, list[Number]] = {}
-        self.queue: dict[str, deque[Number]] = {}
-        self.best_episode_length = 0
-
-        assert max_len > 0
-        self.max_len = max_len
-
+    def __init__(self, learning_cfg: LearningConfig) -> None:
+        self.best_score = 0
         assert learning_cfg.env.wandb_project_name is not None
         learning_cfg.env.exp_name = WandbLogger.check_name_overlap(learning_cfg.env.exp_name)
 
@@ -46,7 +44,7 @@ class WandbLogger:
             project=learning_cfg.env.wandb_project_name,
             name=learning_cfg.env.exp_name,
             dir='./logs/',
-            config=learning_cfg.config_dump()
+            config=learning_cfg.model_dump(mode='json')
         )
 
         self.temp_dir = WANDB_TEMP_DIR / f"{datetime.now(ZoneInfo("Asia/Seoul")):%m%d_%H%M%S}_{uuid4().hex[:8]}"
@@ -56,49 +54,15 @@ class WandbLogger:
             ignore_errors=True
         )
 
-    def add_metric(self, data: dict[str, Number]):
-        for key, value in data.items():
-            if (self.metric.get(key) is None):
-                self.metric[key] = []
 
-            self.metric[key].append(value)
+    def write(self, collector: LogCollector, step: int):
+        self.run.log(data=collector.log_data, step=step)
 
-    def add_queue(self, info: dict[str, Any]):
-        for key in GYM_KEYS:
-            if key not in info:
-                continue
 
-            mask = info.get(f'_{key}', np.ones(len(info[key]), dtype=bool))
-
-            wandb_key = f'rollout/{key}'
-            for value in info[key][mask]:
-                if (self.queue.get(wandb_key) is None):
-                    self.queue[wandb_key] = deque(maxlen=self.max_len)
-
-                self.queue[wandb_key].append(value)
-
-    def write_queue(self, step: int):
-        log_data: dict[str, Number] = {}
-        for key, value_queue in self.queue.items():
-            log_data[key] = sum(value_queue) / len(value_queue)
-
-        self.run.log(data=log_data, step=step)
-
-    def write_metric(self, step: int):
-        log_data: dict[str, Number] = {}
-
-        for key, value_list in self.metric.items():
-            log_data[key] = sum(value_list) / len(value_list)
-
-        self.run.log(data=log_data, step=step)
-        self.metric.clear()
-
-    def save_weights(self, module: torch.nn.Module):
-        if (queue := self.queue.get('rollout/episode_length')) is not None and len(queue) > 0.75*self.max_len:
-            current_length = sum(queue) / len(queue)
-
-            if (current_length > self.best_episode_length):
-                self.best_episode_length = current_length
+    def save_weights(self, module: torch.nn.Module, collector: QueueCollector, benchKey: str):
+        if collector.len_data.get(benchKey, 0) > collector.maxlen * 0.75:  # noqa: SIM102
+            if (score := collector.log_data.get(benchKey, 0)) > self.best_score:
+                self.best_score = score
 
                 checkpoint_path = self.temp_dir / 'checkpoint' / 'checkpoint_best.pt'
                 checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -110,6 +74,32 @@ class WandbLogger:
                     policy='now'
                 )
 
+    def save_timer_chart(self):
+        fig : Figure
+        axes : Sequence[Axes]
+        fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+
+        labels = list(Timer.time_dict.keys())
+        values = [v / 60.0 for v in Timer.time_dict.values()]
+
+        axes[0].bar(labels, values)
+        axes[0].set_title('Process Time Spanded')
+        axes[0].set_xlabel('Process name')
+        axes[0].set_ylabel('Time [min]')
+        axes[0].grid(True, axis='y', linestyle='--', alpha=0.5)
+
+        axes[1].pie(values, labels=labels, autopct="%1.1f%%")
+        axes[1].set_title('Process Time Proportion [%]')
+        fig.tight_layout()
+
+        chart_path = self.temp_dir / "timer_chart.png"
+        chart_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(chart_path, dpi=150)
+        self.run.save(
+            glob_str=chart_path,
+            base_path=self.temp_dir,
+            policy='now'
+        )
                 
     def finish(self, module: torch.nn.Module|None = None, summary_data: dict[str, Number]|None = None):
         if module:
@@ -123,7 +113,7 @@ class WandbLogger:
                 policy='now'
             )
 
-        self.run.summary['benchmark/best_episode_length'] = self.best_episode_length
+        self.run.summary['benchmark/best_episode_length'] = self.best_score
         if summary_data:
             self.run.summary.update(summary_data)
 
@@ -151,18 +141,13 @@ class WandbLogger:
                 case 'yes':
                     break
                 case 'no':
-                    printer(
-                        '[bold blue](Logger)[/] Enter new name of run:',
-                        end=' '
-                    )
+                    printer('[bold blue](Logger)[/] Enter new name of run:',end=' ')
                     display_name = input()
                 case _:
-                    printer(
-                        '[bold][blue](Logger)[/] you can only enter yes or no'
-                    )
+                    printer('[bold][blue](Logger)[/] you can only enter yes or no')
 
         return display_name
-
+    
 
 class ProgressLogger:
     def __init__(self, total: float) -> None:
