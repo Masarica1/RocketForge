@@ -56,3 +56,10 @@ include_directories(
 add_library(simulation STATIC
     simulation/source/dummy.cpp
 )
+target_link_libraries(
+    simulation
+    PRIVATE
+        raylib
+        pybind11::headers
+        nlohmann_json::nlohmann_json
+)
