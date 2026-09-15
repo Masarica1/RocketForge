@@ -1,5 +1,6 @@
 #pragma once
 #include <optional>
+#include <random>
 
 #include "core/model.hpp"
 #include "core/math/vec2.hpp"
@@ -22,13 +23,13 @@ class Rocket {
 private:
     Transform transform_;
     RigidBody rb_;
-
     RocketEngine engine_;
-
     const ShapeData& shape_;
+
+    std::mt19937 rng_{std::random_device{}()};
 public:
 
-    Rocket(Transform, RigidBody, RocketEngine, ShapeData*);
+    Rocket(Transform, RigidBody, RocketEngine, const ShapeData&);
 
     [[nodiscard]]
     const Transform& transform() const;
@@ -42,7 +43,17 @@ public:
     void addExternalForce(Vec2 force);
     void addEngineForce(Input);
     void advance(Input input, float dt);
-    void reset(const config::WorldConfig& config, std::optional<unsigned int> seed = std::nullopt);
+
+    /** reset the state of rocket
+    * @param spaceSize size of world space.
+    * @param config config data of rocket randomness
+    * @param seed seed data for rng. use last seeded rng contiously when nullopt 
+    */
+    void reset(
+        SizeInt spaceSize,
+        const config::Randomness::Rocket& config,
+        std::optional<unsigned int> seed = std::nullopt
+    );
 };
 
 

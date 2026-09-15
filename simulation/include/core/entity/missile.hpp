@@ -16,17 +16,15 @@ private:
     RigidBody rb_;
 
     const ShapeData& shape_;
-    const config::WorldConfig& config;
+    const config::Randomness::Missile config_;
 
     float respawnDelaySeconds_ = 0;
     bool alive_ = false;
 
-    std::mt19937 rng_{1};
-
-    bool outOfBound(SizeInt spaceSize) const;
+    std::mt19937 rng_{std::random_device{}()};
 
 public:
-    Missile(Transform, RigidBody, const ShapeData&, const config::WorldConfig&);
+    Missile(Transform, RigidBody, const ShapeData&, const config::Randomness::Missile&);
 
     [[nodiscard]]
     const Transform& transform() const noexcept;
@@ -43,7 +41,7 @@ public:
     [[nodiscard]]
     float respawnDelaySeconds() const noexcept;
     
-    void advance(Vec2 targetCenter);
+    void advance(SizeInt size, float dt, Vec2 respawnTarget);
     void reset(std::optional<unsigned int> seed = std::nullopt);
     void spawnSchedule();
     void despawn();

@@ -55,6 +55,7 @@ include_directories(
 ## python module
 add_library(simulation STATIC
     simulation/source/dummy.cpp
+    simulation/source/core/entity/missile.hpp
 )
 target_link_libraries(
     simulation
