@@ -18,10 +18,10 @@ private:
     config::WorldConfig worldConfig_;
     std::uint64_t tick_;
 
-    const ShapeLibaray* shape;
+    const ShapeLibaray* shape_;
 
 public:
-    explicit World(Rocket, Missile, config::WorldConfig);
+    explicit World(Rocket, Missile, config::WorldConfig, const ShapeLibaray*);
 
     [[nodiscard]]
     const Rocket& rocket() const noexcept;
@@ -30,18 +30,12 @@ public:
     const Missile& missile() const noexcept;
 
     [[nodiscard]]
-    const config::WorldConfig worldConfig() const noexcept;
-
-    [[nodiscard]]
-    bool isMissileCollision() const;
-
-    [[nodiscard]]
-    bool isOutOfBound() const;
+    const config::WorldConfig& worldConfig() const noexcept;
 
     [[nodiscard]]
     std::uint64_t tick() const noexcept;
 
-    void advance(Input);
+    std::optional<WorldEvent> advance(Input);
     void reset(std::optional<unsigned int> seed = std::nullopt);
 };
 

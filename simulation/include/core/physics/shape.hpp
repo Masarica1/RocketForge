@@ -5,9 +5,10 @@
 
 namespace simulation {
 
-/// Polygon data derived from asset json data.
+/// Polygon data.
 using Polygon = std::vector<Vec2>;
 
+/// Polygon data derived from raw json data.
 struct ShapeData {
     Polygon polygon;
     SizeInt sourceSize;

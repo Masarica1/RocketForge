@@ -2,6 +2,7 @@
 
 #include "core/entity/rocket.hpp"
 #include "core/math/vec2.hpp"
+#include "core/physics/config.hpp"
 #include "core/physics/rigidbody.hpp"
 #include "core/physics/shape.hpp"
 #include "core/physics/transform.hpp"
@@ -12,9 +13,11 @@ Rocket::Rocket(
     Transform transform,
     RigidBody rb,
     RocketEngine engine,
-    const ShapeData& shape
+    const Polygon& polygon,
+    const config::Randomness::Rocket& config
+
 )
-: transform_(transform), rb_(rb), engine_(engine), shape_(shape) {}
+: transform_(transform), rb_(rb), engine_(engine), polygon_(polygon), config_(config) {}
 
 const Transform& Rocket::transform() const {
     return transform_;
@@ -24,8 +27,8 @@ const RigidBody& Rocket::rb() const {
     return rb_;
 }
 
-const ShapeData& Rocket::shape() const {
-    return shape_;
+const Polygon& Rocket::polygon() const {
+    return polygon_;
 }
 
 void Rocket::addExternalForce(Vec2 force) {
@@ -55,7 +58,6 @@ void Rocket::advance(Input input, float dt) {
 
 void Rocket::reset(
     SizeInt spaceSize,
-    const config::Randomness::Rocket& config,
     std::optional<unsigned int> seed
 ) {
     if (seed.has_value()) {rng_.seed(*seed);}
@@ -67,8 +69,8 @@ void Rocket::reset(
 
     // randomize initial state
     std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-    transform_.move(config.initPosRatio * spaceSize.toVec() * Vec2(dist(rng_), dist(rng_)));
-    transform_.rotate(config.initAngle * dist(rng_)); 
-    rb_.setLinearVel(config.initLinearVel * Vec2(dist(rng_), dist(rng_)));
-    rb_.setAngularVel(config.initAngularVel * dist(rng_));  
+    transform_.move(config_.initPosRatio * spaceSize.toVec() * Vec2(dist(rng_), dist(rng_)));
+    transform_.rotate(config_.initAngle * dist(rng_)); 
+    rb_.setLinearVel(config_.initLinearVel * Vec2(dist(rng_), dist(rng_)));
+    rb_.setAngularVel(config_.initAngularVel * dist(rng_));  
 }

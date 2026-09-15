@@ -15,16 +15,17 @@ private:
     Transform transform_;
     RigidBody rb_;
 
-    const ShapeData& shape_;
+    const Polygon& polygon_;
     const config::Randomness::Missile config_;
 
     float respawnDelaySeconds_ = 0;
+    bool needToBeRespawn_ = false;
     bool alive_ = false;
 
     std::mt19937 rng_{std::random_device{}()};
 
 public:
-    Missile(Transform, RigidBody, const ShapeData&, const config::Randomness::Missile&);
+    Missile(Transform, RigidBody, const Polygon&, const config::Randomness::Missile&);
 
     [[nodiscard]]
     const Transform& transform() const noexcept;
@@ -33,17 +34,24 @@ public:
     const RigidBody& rb() const noexcept;
 
     [[nodiscard]]
-    const ShapeData& shape() const noexcept;
+    const Polygon& polygon() const noexcept;
     
     [[nodiscard]]
     bool alive() const noexcept;
+
+    [[nodiscard]]
+    bool needToBeRespawn() const noexcept;
 
     [[nodiscard]]
     float respawnDelaySeconds() const noexcept;
     
     void advance(SizeInt size, float dt, Vec2 respawnTarget);
     void reset(std::optional<unsigned int> seed = std::nullopt);
+
+    /// kill missile when this method called.
     void spawnSchedule();
+
+    /// kill missile
     void despawn();
 };
 

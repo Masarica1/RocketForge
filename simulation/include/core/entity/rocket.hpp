@@ -24,12 +24,14 @@ private:
     Transform transform_;
     RigidBody rb_;
     RocketEngine engine_;
-    const ShapeData& shape_;
+
+    const Polygon& polygon_;
+    const config::Randomness::Rocket& config_;
 
     std::mt19937 rng_{std::random_device{}()};
 public:
 
-    Rocket(Transform, RigidBody, RocketEngine, const ShapeData&);
+    Rocket(Transform, RigidBody, RocketEngine, const Polygon&, const config::Randomness::Rocket&);
 
     [[nodiscard]]
     const Transform& transform() const;
@@ -38,7 +40,7 @@ public:
     const RigidBody& rb() const;
 
     [[nodiscard]]
-    const ShapeData& shape() const;
+    const Polygon& polygon() const;
 
     void addExternalForce(Vec2 force);
     void addEngineForce(Input);
@@ -51,7 +53,6 @@ public:
     */
     void reset(
         SizeInt spaceSize,
-        const config::Randomness::Rocket& config,
         std::optional<unsigned int> seed = std::nullopt
     );
 };

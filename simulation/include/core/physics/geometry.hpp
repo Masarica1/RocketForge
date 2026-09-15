@@ -10,9 +10,9 @@ bool isOutOfBound(const Transform&, SizeInt spaceSize);
 
 bool isCollide(
     const Transform&,
-    const ShapeData&,
+    const Polygon&,
     const Transform&,
-    const ShapeData&
+    const Polygon&
 );
 
 
