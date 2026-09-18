@@ -12,11 +12,28 @@ using Polygon = std::vector<Vec2>;
 struct ShapeData {
     Polygon polygon;
     SizeInt sourceSize;
+
+    Polygon toWolrdPolygon(SizeInt entitySize) const {
+        return toWolrdPolygon(entitySize.toVec());
+    }
+
+    Polygon toWolrdPolygon(Vec2 entitySize) const {
+        Polygon result = {};
+        Vec2 ratio = {
+            .x = entitySize.x / static_cast<float>(sourceSize.width),
+            .y = entitySize.y / static_cast<float>(sourceSize.height)
+        };
+
+        for (const auto& vertice: polygon) {
+            result.push_back(vertice * ratio);
+        }
+        return result;
+    }
 };
 
-struct ShapeLibaray {
-    ShapeData rocket;
-    ShapeData sourceSize;
+struct PolygonLibrary {
+    Polygon rocket;
+    Polygon missile;
 };
 
 }

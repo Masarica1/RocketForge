@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=./schemas/learning-config.schema.json
+# yaml-language-server: $schema=../schemas/learning-config.schema.json
 
 env_config:
   exp_name: Run-2.0

@@ -5,6 +5,8 @@
 #include "core/entity/rocket.hpp"
 #include "core/model.hpp"
 #include "core/physics/config.hpp"
+
+#include "asset/loader.hpp"
 #include "core/physics/shape.hpp"
 
 
@@ -13,15 +15,15 @@ namespace simulation {
 
 class World {
 private:
+    config::WorldConfig worldConfig_;
     Rocket rocket_;
     Missile missile_;
-    config::WorldConfig worldConfig_;
+
     std::uint64_t tick_;
 
-    const ShapeLibaray* shape_;
-
 public:
-    explicit World(Rocket, Missile, config::WorldConfig, const ShapeLibaray*);
+    World(Rocket, Missile, config::WorldConfig);
+    World(const SimulationConfig&, const PolygonLibrary&);
 
     [[nodiscard]]
     const Rocket& rocket() const noexcept;

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <fstream>
 #include <utility>
+#include <string>
 
 #include <nlohmann/json.hpp>
 
@@ -24,6 +26,14 @@ inline void from_json(const nlohmann::json& j, ShapeData& data) {
     }
 
     data = std::move(parsed);
+}
+
+inline ShapeData LoadShapeData(const std::string& path) {
+    std::ifstream file(path);
+    nlohmann::json j;
+    file >> j;
+
+    return j.get<ShapeData>();
 }
 
 }

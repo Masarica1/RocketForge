@@ -1,0 +1,39 @@
+config:
+  space_size: [960, 540]
+
+  # physics settings
+  physics:
+    g: -9.81
+    fps: 120
+  
+  # randomness settings
+  rocket_randomness:
+    init_pos_ratio: [0.20, 0.20]
+    init_angle: 90.0
+    init_linear_vel: [50, 25]
+    init_angular_vel : 45
+
+  missile_randomness:
+    target_pos_error: [75, 75]
+    min_linear_vel: 50
+    max_linear_vel: 150
+    min_respawn_time: 1
+    max_respawn_time: 4
+
+entity:
+  rocket:
+    # normal settings
+    size: [60, 60]
+    mass: 400.0
+    moi: 400.0
+
+    # engine
+    engine:
+      main_force: 21000
+      sub_force: 4500
+      sub_torque: 800
+
+  missile:
+    size: [60, 60]
+    mass: 200
+    moi: 200

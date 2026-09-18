@@ -8,16 +8,35 @@
 #include "core/physics/geometry.hpp"
 #include "core/physics/shape.hpp"
 
+#include "asset/loader.hpp"
+
 using namespace simulation;
 using namespace simulation::config;
 
 World::World(
     Rocket rocket,
     Missile missile,
-    WorldConfig config,
-    const ShapeLibaray* shape
+    WorldConfig config
 )
-: rocket_(rocket), missile_(missile), worldConfig_(config), shape_(shape), tick_(0U) {}
+: worldConfig_(config), rocket_(rocket), missile_(missile), tick_(0U) {}
+
+World::World(const SimulationConfig& simConfig, const PolygonLibrary& library)
+: 
+worldConfig_(simConfig.worldConfig),
+rocket_(
+    simConfig.rocketTransform,
+    simConfig.rocketRigidBody,
+    simConfig.rocketEngine,
+    library.rocket,
+    worldConfig_.random.rocket
+),
+missile_(
+    simConfig.missileTransform,
+    simConfig.missileRigidBody,
+    library.missile,
+    worldConfig_.random.missile
+),
+tick_(0U) {}
 
 const Rocket& World::rocket() const noexcept {
     return rocket_;
@@ -36,6 +55,7 @@ std::uint64_t World::tick() const noexcept {
 }
 
 std::optional<WorldEvent> World::advance(Input input) {
+    std::optional<WorldEvent> event = std::nullopt;
     tick_ += 1;
 
     // advance simulation
@@ -44,19 +64,20 @@ std::optional<WorldEvent> World::advance(Input input) {
     missile_.advance(worldConfig_.spaceSize, worldConfig_.physics.dt, rocket_.transform().center());
 
     // collision process
-    if (isCollide(rocket_.transform(), rocket_.polygon(), missile_.transform(), missile_.polygon())) {
-        return WorldEvent::MissileCollision;
+    if (isOutOfBound(rocket_.transform(), worldConfig_.spaceSize)) {
+        event = WorldEvent::OutOfBound;
     }
 
-    if (isOutOfBound(rocket_.transform(), worldConfig_.spaceSize)) {
-        return WorldEvent::OutOfBound;
+    if (isCollide(rocket_.transform(), rocket_.polygon(), missile_.transform(), missile_.polygon())) {
+        event = WorldEvent::MissileCollision;
     }
 
     if (isOutOfBound(missile_.transform(), worldConfig_.spaceSize)) {
         missile_.despawn();
         missile_.spawnSchedule();
     }
-    return std::nullopt;
+
+    return event;
 }
 
 void World::reset(std::optional<unsigned int> seed) {

@@ -45,6 +45,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+## yaml-cpp
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG yaml-cpp-0.9.0
+)
+FetchContent_MakeAvailable(yaml-cpp)
+
 # include
 include_directories(
     simulation
@@ -54,10 +62,12 @@ include_directories(
 # make
 ## python module
 add_library(simulation STATIC
-    simulation/source/dummy.cpp
+    simulation/source/asset/loader.cpp
+    simulation/source/asset/yaml.cpp
     simulation/source/core/entity/missile.cpp
     simulation/source/core/entity/rocket.cpp
     simulation/source/core/physics/geometry.cpp
+    simulation/source/core/world.cpp
 )
 target_link_libraries(
     simulation
@@ -65,4 +75,15 @@ target_link_libraries(
         raylib
         pybind11::headers
         nlohmann_json::nlohmann_json
+        yaml-cpp::yaml-cpp
+)
+
+add_executable(simulation_app
+    simulation/source/dummy.cpp
+)
+
+target_link_libraries(
+    simulation_app
+    PRIVATE
+        simulation
 )
